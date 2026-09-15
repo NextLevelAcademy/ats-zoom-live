@@ -492,8 +492,27 @@ export async function generateReport(
   for (const r of reg) {
     if (r.fullPhone) regByPhone.set(r.fullPhone, r);
   }
+
+  // Sum each participant's duration across all their join segments (Zoom
+  // logs a separate row per rejoin), then require MORE than 10 minutes
+  // total in the room to count as a show-up — someone who joined and left
+  // within 10 minutes is treated as a no-show, matching the reference.
+  const partDedupMap = new Map<string, PartRow & { totalDuration: number }>();
+  for (const p of part) {
+    if (!p.email) continue;
+    const ex = partDedupMap.get(p.email);
+    if (ex) {
+      ex.totalDuration = (ex.totalDuration || 0) + (p.durationMinutes || 0);
+    } else {
+      partDedupMap.set(p.email, { ...p, totalDuration: p.durationMinutes || 0 });
+    }
+  }
+  const MIN_SHOWUP_MINUTES = 10;
+  const partDedup = Array.from(partDedupMap.values()).filter(
+    (p) => p.totalDuration > MIN_SHOWUP_MINUTES
+  );
   const partByEmail = new Map<string, PartRow>();
-  for (const p of part) partByEmail.set(p.email, p);
+  for (const p of partDedup) partByEmail.set(p.email, p);
 
   // ===== Sign-ups (TC + BT) =====
   const signUpRows: SignUpRow[] = [];
@@ -611,20 +630,9 @@ export async function generateReport(
     const p = (fullPhone || "").replace(/\D/g, "");
     return !!p && signUpPhones.has(p);
   };
-  const partEmails = new Set(part.map((p) => p.email));
+  const partEmails = new Set(partDedup.map((p) => p.email));
 
   // ===== Show up Merge (one row per UNIQUE participant email; sum durations) =====
-  const partDedupMap = new Map<string, PartRow & { totalDuration: number }>();
-  for (const p of part) {
-    if (!p.email) continue;
-    const ex = partDedupMap.get(p.email);
-    if (ex) {
-      ex.totalDuration = (ex.totalDuration || 0) + (p.durationMinutes || 0);
-    } else {
-      partDedupMap.set(p.email, { ...p, totalDuration: p.durationMinutes || 0 });
-    }
-  }
-  const partDedup = Array.from(partDedupMap.values());
   const showUpMerge: ShowUpMergeRow[] = partDedup.map((p) => {
     // Attendee data (name/phone/country) comes straight from the Zoom
     // Registration row itself — Opt-In IS the registration list, so there's
