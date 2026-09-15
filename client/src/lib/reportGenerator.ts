@@ -494,9 +494,9 @@ export async function generateReport(
   }
 
   // Sum each participant's duration across all their join segments (Zoom
-  // logs a separate row per rejoin), then require MORE than 10 minutes
+  // logs a separate row per rejoin), then require AT LEAST 10 minutes
   // total in the room to count as a show-up — someone who joined and left
-  // within 10 minutes is treated as a no-show, matching the reference.
+  // within 9 minutes or less is treated as a no-show, matching the reference.
   const partDedupMap = new Map<string, PartRow & { totalDuration: number }>();
   for (const p of part) {
     if (!p.email) continue;
@@ -509,7 +509,7 @@ export async function generateReport(
   }
   const MIN_SHOWUP_MINUTES = 10;
   const partDedup = Array.from(partDedupMap.values()).filter(
-    (p) => p.totalDuration > MIN_SHOWUP_MINUTES
+    (p) => p.totalDuration >= MIN_SHOWUP_MINUTES
   );
   const partByEmail = new Map<string, PartRow>();
   for (const p of partDedup) partByEmail.set(p.email, p);
