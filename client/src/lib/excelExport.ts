@@ -388,6 +388,37 @@ export function downloadExcelReport(report: ReportData): void {
   ];
   XLSX.utils.book_append_sheet(wb, oldStudentsSheet, "Old Students");
 
+  // ============ Sheet 9: Short Duration No-Show ============
+  // Attendees who joined but stayed 9 minutes or less — excluded from Show
+  // Up, listed here so it's visible who got filtered out and why.
+  const shortDurationHeader = [
+    "Name",
+    "Email",
+    "Phone Number",
+    "Country",
+    "Duration (min)",
+  ];
+  const shortDurationRows = report.shortDurationNoShows ?? [];
+  const shortDurationData: any[][] = [
+    shortDurationHeader,
+    ...shortDurationRows.map((r) => [
+      r.fullName,
+      r.email,
+      r.fullPhone,
+      r.country,
+      r.durationMinutes,
+    ]),
+  ];
+  const shortDurationSheet = XLSX.utils.aoa_to_sheet(shortDurationData);
+  shortDurationSheet["!cols"] = [
+    { wch: 22 },
+    { wch: 32 },
+    { wch: 14 },
+    { wch: 10 },
+    { wch: 14 },
+  ];
+  XLSX.utils.book_append_sheet(wb, shortDurationSheet, "Short Duration No-Show");
+
   // Filename
   const safeDate = ddmmyy || new Date().toISOString().split("T")[0].replace(/-/g, "");
   const filename = `ATS_Zoom_Live_Report_${safeDate}.xlsx`;
