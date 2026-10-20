@@ -20,6 +20,16 @@ function digits(s: string | null | undefined): string {
 }
 
 /**
+ * Some contacts have Singapore's "65" country code typed twice in a row
+ * (e.g. "656594682910" instead of "6594682910") — strip exactly one leading
+ * "6565" down to "65" before country-code detection runs. A number that
+ * merely starts with "65" once (e.g. "650122123318") is left untouched.
+ */
+function stripDoubledSgPrefix(d: string): string {
+  return d.startsWith("6565") ? "65" + d.slice(4) : d;
+}
+
+/**
  * Parse a Keap / Zoom-style phone like:
  *   `'+65 87661449   `   → cc=65, phone=87661449
  *   `'+65 8915 9826   `  → cc=65, phone=89159826
@@ -44,7 +54,7 @@ function parseApostrophePhone(raw: string): { cc: string; local: string } {
       return { cc, local };
     }
     // No space — try to split a known country code prefix
-    const d = digits(afterPlus);
+    const d = stripDoubledSgPrefix(digits(afterPlus));
     if (d.startsWith("65") && d.length >= 10) return { cc: "65", local: d.slice(2) };
     if (d.startsWith("60") && d.length >= 11) return { cc: "60", local: d.slice(2) };
     if (d.startsWith("852") && d.length >= 11) return { cc: "852", local: d.slice(3) };
@@ -54,7 +64,7 @@ function parseApostrophePhone(raw: string): { cc: string; local: string } {
     return { cc: "", local: d };
   }
   // No leading +: could be a raw 8-digit SG local, or country-code-included intl
-  const d = digits(s);
+  const d = stripDoubledSgPrefix(digits(s));
   if (!d) return { cc: "", local: "" };
   // 8-digit SG local (starts with 6,8,9)
   if (d.length === 8 && /^[689]/.test(d)) return { cc: "65", local: d };
