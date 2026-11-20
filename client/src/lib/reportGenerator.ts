@@ -4,7 +4,6 @@ import type {
   OldStudentExclusionRow,
   ReportData,
   SessionDetails,
-  ShortDurationRow,
   ShowUpMergeRow,
   ShowUpRegRow,
   SignUpRow,
@@ -505,9 +504,8 @@ export async function generateReport(
   }
 
   // Sum each participant's duration across all their join segments (Zoom
-  // logs a separate row per rejoin), then require AT LEAST 10 minutes
-  // total in the room to count as a show-up — someone who joined and left
-  // within 9 minutes or less is treated as a no-show, matching the reference.
+  // logs a separate row per rejoin) — everyone who joins counts as a
+  // show-up regardless of how long they stayed.
   const partDedupMap = new Map<string, PartRow & { totalDuration: number }>();
   for (const p of part) {
     if (!p.email) continue;
@@ -518,36 +516,9 @@ export async function generateReport(
       partDedupMap.set(p.email, { ...p, totalDuration: p.durationMinutes || 0 });
     }
   }
-  const MIN_SHOWUP_MINUTES = 10;
-  const partDedupAll = Array.from(partDedupMap.values());
-  const partDedup = partDedupAll.filter((p) => p.totalDuration >= MIN_SHOWUP_MINUTES);
+  const partDedup = Array.from(partDedupMap.values());
   const partByEmail = new Map<string, PartRow>();
   for (const p of partDedup) partByEmail.set(p.email, p);
-  // Attendees who joined but stayed 9 minutes or less — excluded from Show
-  // Up above; kept here so it's visible who got filtered out and why.
-  const shortDurationNoShows: ShortDurationRow[] = partDedupAll
-    .filter((p) => p.totalDuration < MIN_SHOWUP_MINUTES)
-    .map((p) => {
-      const reg = regByEmail.get(p.email);
-      let name = p.name;
-      let cc = "", local = "", fullPhone = "", country: CountryGroup = "INVALID";
-      if (reg) {
-        name = `${reg.first} ${reg.last}`.trim() || p.name;
-        cc = reg.cc;
-        local = reg.local;
-        fullPhone = reg.fullPhone;
-        country = reg.country;
-      }
-      return {
-        fullName: name,
-        email: p.email,
-        countryCode: cc,
-        phoneNumber: local,
-        fullPhone,
-        country,
-        durationMinutes: p.totalDuration,
-      };
-    });
 
   // ===== Sign-ups (TC + BT) =====
   const signUpRows: SignUpRow[] = [];
@@ -836,7 +807,6 @@ export async function generateReport(
     studentList,
     oldStudentsExcluded: oldStudentsExcludedList,
     oldStudentsShowUpRows,
-    shortDurationNoShows,
     generatedAt: new Date().toISOString(),
     nlow4ExcludedPhones,
     nlow4ExcludedEmails,
